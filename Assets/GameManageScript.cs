@@ -1,6 +1,8 @@
 using JetBrains.Annotations;
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -9,6 +11,8 @@ public class GameManageScript : MonoBehaviour
     int[,] map;
     public GameObject playerPrefab;
     public GameObject boxPrefab;
+    public GameObject goalPrefab;
+    public GameObject clearText;
     GameObject[,] field;
 
     Vector2Int GetPlayerIndex()
@@ -59,8 +63,43 @@ public class GameManageScript : MonoBehaviour
         }
         field[moveTo.y,moveTo.x] = field[moveFrom.y, moveFrom.x];
         field[moveFrom.y, moveFrom.x] = null;
-        field[moveTo.y, moveTo.x].transform.position = new Vector3(moveTo.x, field.GetLength(0) - moveTo.y, 0);
+        field[moveTo.y, moveTo.x].transform.position = IndexToPosition(moveTo);
+        //Vector3 moveToPosition = new Vector3(moveFrom.x, map.GetLength(0) - moveFrom.y, 0);
+        //field[moveFrom.y, moveFrom.x].GetComponent<Move>().MoveTo(moveToPosition);
+
         return true;
+    }
+
+    bool IsCleard()
+    {
+        List<Vector2Int> goals=new List<Vector2Int>();
+        for(int y = 0; y < map.GetLength(0); y++)
+        {
+            for (int x = 0; x < map.GetLength(1); x++)
+            {
+                if (map[y,x] == 3)
+                {
+                    goals.Add(new Vector2Int(x, y));
+                }
+            }
+        }
+        for(int i=0;i<goals.Count;i++)
+        {
+            GameObject f = field[goals[i].y,goals[i].x];
+            if (f == null || f.tag != "Box")
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    Vector3 IndexToPosition(Vector2Int index)
+    {
+        return new Vector3(
+                index.x - map.GetLength(1) / 2 + 0.5f,
+                -index.y + map.GetLength(0) / 2,
+                0);
     }
 
     //Start is called before the first frame update
@@ -70,9 +109,13 @@ public class GameManageScript : MonoBehaviour
 
         map = new int[,]
         {
-            {0,0,0,0,0},
-            {0,2,1,2,0},
-            {0,0,0,0,0},
+            {2,2,2,2,2,2,2,2,2},
+            {2,3,2,0,0,0,2,3,2},
+            {2,0,0,0,1,0,0,0,2},
+            {2,0,2,0,0,0,2,0,2},
+            {2,0,0,0,0,0,0,0,2},
+            {2,3,0,0,0,0,0,3,2},
+            {2,2,2,2,2,2,2,2,2},
         };
         field = new GameObject
         [
@@ -88,7 +131,7 @@ public class GameManageScript : MonoBehaviour
                 {
                     field[y,x] = Instantiate(
                        playerPrefab,
-                       new Vector3(x , map.GetLength(0) - y, 0),
+                       IndexToPosition(new Vector2Int(x,y)),
                        Quaternion.identity
                     );
                 }
@@ -96,8 +139,19 @@ public class GameManageScript : MonoBehaviour
                 {
                     field[y, x] = Instantiate(
                        boxPrefab,
-                       new Vector3(x, map.GetLength(0) - y, 0),
+                       IndexToPosition(new Vector2Int(x, y)),
                        Quaternion.identity
+                    );
+                }
+                if (map[y, x] == 3)
+                {
+                    field[y, x] = Instantiate(
+                       goalPrefab,
+                       new Vector3(
+                       x - map.GetLength(1) / 2 + 0.5f,
+                       -y + map.GetLength(0) / 2,
+                       0),
+                    Quaternion.identity
                     );
                 }
             }
@@ -110,21 +164,18 @@ public class GameManageScript : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.RightArrow))
         {
             Vector2Int playerindex = GetPlayerIndex();
-            //Vector2Int boxindex = GetBoxIndex();
             //移動処理のメソッド化
             MoveNumber(playerindex, playerindex + new Vector2Int(1, 0)) ;
         }
         if (Input.GetKeyDown(KeyCode.LeftArrow))
         {
             Vector2Int playerindex = GetPlayerIndex();
-            //Vector2Int boxindex = GetBoxIndex();
             //移動処理のメソッド化
             MoveNumber(playerindex, playerindex + new Vector2Int(-1, 0));
         }
         if (Input.GetKeyDown(KeyCode.UpArrow))
         {
             Vector2Int playerindex = GetPlayerIndex();
-            //Vector2Int boxindex = GetBoxIndex();
             //移動処理のメソッド化
             MoveNumber(playerindex, playerindex + new Vector2Int(0, -1));
         }
@@ -132,9 +183,13 @@ public class GameManageScript : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.DownArrow))
         {
             Vector2Int playerindex = GetPlayerIndex();
-            //Vector2Int boxindex = GetBoxIndex();
             //移動処理のメソッド化
             MoveNumber(playerindex, playerindex + new Vector2Int(0, 1));
+        }
+        if (IsCleard())
+        {
+            Debug.Log("Clear");
+            clearText.SetActive(true);
         }
     }
 }
