@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
 
 public class GameManageScript : MonoBehaviour
@@ -13,6 +14,8 @@ public class GameManageScript : MonoBehaviour
     public GameObject boxPrefab;
     public GameObject goalPrefab;
     public GameObject clearText;
+    public GameObject ParticlePrefab;
+    public GameObject playerParticlePrefab;
     GameObject[,] field;
 
     Vector2Int GetPlayerIndex()
@@ -53,20 +56,48 @@ public class GameManageScript : MonoBehaviour
     }
     bool MoveNumber(Vector2Int moveFrom, Vector2Int moveTo)
     {
+        // 範囲チェック
         if (moveTo.y < 0 || moveTo.y >= field.GetLength(0)) { return false; }
         if (moveTo.x < 0 || moveTo.x >= field.GetLength(1)) { return false; }
-        if (field[moveTo.y, moveTo.x] != null && field[moveTo.y,moveTo.x].tag == "Box")
+        // 目的地にボックスがある場合、そのボックスを移動
+        if (field[moveTo.y, moveTo.x] != null && field[moveTo.y, moveTo.x].tag == "Box")
         {
             Vector2Int velocity = moveTo - moveFrom;
             bool success = MoveNumber(moveTo, moveTo + velocity);
             if (!success) { return false; }
         }
-        field[moveTo.y,moveTo.x] = field[moveFrom.y, moveFrom.x];
-        field[moveFrom.y, moveFrom.x] = null;
-        field[moveTo.y, moveTo.x].transform.position = IndexToPosition(moveTo);
-        //Vector3 moveToPosition = new Vector3(moveFrom.x, map.GetLength(0) - moveFrom.y, 0);
-        //field[moveFrom.y, moveFrom.x].GetComponent<Move>().MoveTo(moveToPosition);
-
+        // プレイヤーが動いた時のパーティクルを生成
+        if (field[moveFrom.y, moveFrom.x] != null)
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                Instantiate(playerParticlePrefab, field[moveFrom.y, moveFrom.x].transform.position, Quaternion.identity);
+            }
+        }
+        // 箱が3番に到達した時のパーティクルを生成
+        if (field[moveFrom.y, moveFrom.x] != null && field[moveFrom.y, moveFrom.x].tag == "Box" && map[moveTo.y, moveTo.x] == 3)
+        {
+            for (int i = 0; i < 20; i++)
+            {
+                Instantiate(ParticlePrefab, IndexToPosition(moveTo), Quaternion.identity);
+            }
+        }
+        // 移動処理
+        if (field[moveFrom.y, moveFrom.x] != null)
+        {
+            Vector3 moveToPosition = IndexToPosition(moveTo);
+            Move moveComponent = field[moveFrom.y, moveFrom.x].GetComponent<Move>();
+            if (moveComponent != null)
+            {
+                moveComponent.MoveTo(moveToPosition);
+                field[moveTo.y, moveTo.x] = field[moveFrom.y, moveFrom.x];
+                field[moveFrom.y, moveFrom.x] = null;
+            }
+            else
+            {
+                Debug.LogError("Move component not found on the object.");
+            }
+        }
         return true;
     }
 
@@ -98,8 +129,8 @@ public class GameManageScript : MonoBehaviour
     {
         return new Vector3(
                 index.x - map.GetLength(1) / 2 + 0.5f,
-                -index.y + map.GetLength(0) / 2,
-                0);
+                0,
+                -index.y + map.GetLength(0) / 2);
     }
 
     //Start is called before the first frame update
@@ -117,6 +148,7 @@ public class GameManageScript : MonoBehaviour
             {2,3,0,0,0,0,0,3,2},
             {2,2,2,2,2,2,2,2,2},
         };
+
         field = new GameObject
         [
             map.GetLength(0),
@@ -149,46 +181,72 @@ public class GameManageScript : MonoBehaviour
                        goalPrefab,
                        new Vector3(
                        x - map.GetLength(1) / 2 + 0.5f,
-                       -y + map.GetLength(0) / 2,
-                       0),
+                       0,
+                       -y + map.GetLength(0) / 2),
                     Quaternion.identity
                     );
                 }
             }
         }
     }
-
     //update is called once per frame
     void Update()
     {
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            // 既存のオブジェクトを削除
+            foreach (GameObject obj in field)
+            {
+                if (obj != null)
+                {
+                    Destroy(obj);
+                }
+            }
+            Start();
+            clearText.SetActive(false);
+        }
         if (Input.GetKeyDown(KeyCode.RightArrow))
         {
             Vector2Int playerindex = GetPlayerIndex();
             //移動処理のメソッド化
-            MoveNumber(playerindex, playerindex + new Vector2Int(1, 0)) ;
+            if (playerindex != new Vector2Int(-1, -1))
+            {
+                MoveNumber(playerindex, playerindex + new Vector2Int(1, 0));
+            }
         }
         if (Input.GetKeyDown(KeyCode.LeftArrow))
         {
             Vector2Int playerindex = GetPlayerIndex();
             //移動処理のメソッド化
-            MoveNumber(playerindex, playerindex + new Vector2Int(-1, 0));
+            if (playerindex != new Vector2Int(-1, -1))
+            {
+                MoveNumber(playerindex, playerindex + new Vector2Int(-1, 0));
+            }
         }
         if (Input.GetKeyDown(KeyCode.UpArrow))
         {
             Vector2Int playerindex = GetPlayerIndex();
             //移動処理のメソッド化
-            MoveNumber(playerindex, playerindex + new Vector2Int(0, -1));
+            if (playerindex != new Vector2Int(-1, -1))
+            {
+                MoveNumber(playerindex, playerindex + new Vector2Int(0, -1));
+            }
         }
 
         if (Input.GetKeyDown(KeyCode.DownArrow))
         {
             Vector2Int playerindex = GetPlayerIndex();
             //移動処理のメソッド化
-            MoveNumber(playerindex, playerindex + new Vector2Int(0, 1));
+            if (playerindex != new Vector2Int(-1, -1))
+            {
+                MoveNumber(playerindex, playerindex + new Vector2Int(0, 1));
+            }
         }
         if (IsCleard())
         {
             Debug.Log("Clear");
+            // パーティクルを生成（クリアテキストの位置）
+            Instantiate(ParticlePrefab, new Vector3(0.5f,0,-1), Quaternion.identity);
             clearText.SetActive(true);
         }
     }
