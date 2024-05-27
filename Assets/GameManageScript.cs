@@ -17,6 +17,8 @@ public class GameManageScript : MonoBehaviour
     public GameObject ParticlePrefab;
     public GameObject playerParticlePrefab;
     GameObject[,] field;
+    List<GameObject> spawnedObjects = new List<GameObject>();
+    bool next;
 
     Vector2Int GetPlayerIndex()
     {
@@ -36,6 +38,7 @@ public class GameManageScript : MonoBehaviour
         }
         return new Vector2Int(-1, -1);
     }
+
     Vector2Int GetBoxIndex()
     {
         for (int y = 0; y < map.GetLength(0); y++)
@@ -54,6 +57,7 @@ public class GameManageScript : MonoBehaviour
         }
         return new Vector2Int(-1, -1);
     }
+
     bool MoveNumber(Vector2Int moveFrom, Vector2Int moveTo)
     {
         // 範囲チェック
@@ -103,20 +107,20 @@ public class GameManageScript : MonoBehaviour
 
     bool IsCleard()
     {
-        List<Vector2Int> goals=new List<Vector2Int>();
-        for(int y = 0; y < map.GetLength(0); y++)
+        List<Vector2Int> goals = new List<Vector2Int>();
+        for (int y = 0; y < map.GetLength(0); y++)
         {
             for (int x = 0; x < map.GetLength(1); x++)
             {
-                if (map[y,x] == 3)
+                if (map[y, x] == 3)
                 {
                     goals.Add(new Vector2Int(x, y));
                 }
             }
         }
-        for(int i=0;i<goals.Count;i++)
+        for (int i = 0; i < goals.Count; i++)
         {
-            GameObject f = field[goals[i].y,goals[i].x];
+            GameObject f = field[goals[i].y, goals[i].x];
             if (f == null || f.tag != "Box")
             {
                 return false;
@@ -133,121 +137,142 @@ public class GameManageScript : MonoBehaviour
                 -index.y + map.GetLength(0) / 2);
     }
 
-    //Start is called before the first frame update
-    void Start()
+    void InitializeMap()
     {
-        //配列の実態の生成と初期化
-
-        map = new int[,]
+        if (!next)
         {
-            {2,2,2,2,2,2,2,2,2},
-            {2,3,2,0,0,0,2,3,2},
-            {2,0,0,0,1,0,0,0,2},
-            {2,0,2,0,0,0,2,0,2},
-            {2,0,0,0,0,0,0,0,2},
-            {2,3,0,0,0,0,0,3,2},
-            {2,2,2,2,2,2,2,2,2},
-        };
-
-        field = new GameObject
-        [
-            map.GetLength(0),
-            map.GetLength(1)
-        ];
-
-        for(int y = 0; y < map.GetLength(0); y++)
-        {
-            for(int x = 0; x < map.GetLength(1); x++)
+            map = new int[,]
             {
-                if (map[y,x] == 1)
+                {2,2,2,2,2,2,2,2,2},
+                {2,3,2,0,0,0,2,3,2},
+                {2,0,0,0,1,0,0,0,2},
+                {2,0,2,0,0,0,2,0,2},
+                {2,0,0,0,0,0,0,0,2},
+                {2,3,0,0,0,0,0,3,2},
+                {2,2,2,2,2,2,2,2,2},
+            };
+        }
+        if (next)
+        {
+            map = new int[,]
+            {
+                {2,2,2,2,2,2,2,2,2},
+                {2,0,2,0,0,0,0,3,2},
+                {2,3,0,0,0,0,0,2,2},
+                {2,0,0,0,1,0,0,0,2},
+                {2,2,2,0,0,0,0,0,2},
+                {2,0,3,0,0,0,0,3,2},
+                {2,2,2,2,2,2,2,2,2},
+            };
+        }
+
+        field = new GameObject[map.GetLength(0), map.GetLength(1)];
+    }
+
+    void SetupField()
+    {
+        for (int y = 0; y < map.GetLength(0); y++)
+        {
+            for (int x = 0; x < map.GetLength(1); x++)
+            {
+                if (map[y, x] == 1)
                 {
-                    field[y,x] = Instantiate(
+                    field[y, x] = Instantiate(
                        playerPrefab,
-                       IndexToPosition(new Vector2Int(x,y)),
+                       IndexToPosition(new Vector2Int(x, y)),
                        Quaternion.identity
                     );
+                    spawnedObjects.Add(field[y, x]);
                 }
-                if (map[y, x] == 2)
+                else if (map[y, x] == 2)
                 {
                     field[y, x] = Instantiate(
                        boxPrefab,
                        IndexToPosition(new Vector2Int(x, y)),
                        Quaternion.identity
                     );
+                    spawnedObjects.Add(field[y, x]);
                 }
-                if (map[y, x] == 3)
+                else if (map[y, x] == 3)
                 {
                     field[y, x] = Instantiate(
                        goalPrefab,
-                       new Vector3(
-                       x - map.GetLength(1) / 2 + 0.5f,
-                       0,
-                       -y + map.GetLength(0) / 2),
-                    Quaternion.identity
+                       IndexToPosition(new Vector2Int(x, y)),
+                       Quaternion.identity
                     );
+                    spawnedObjects.Add(field[y, x]);
                 }
             }
         }
     }
-    //update is called once per frame
+
+    void Start()
+    {
+        Screen.SetResolution(1280, 720, false);
+        InitializeMap();
+        SetupField();
+    }
+
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.R))
         {
             // 既存のオブジェクトを削除
-            foreach (GameObject obj in field)
+            foreach (GameObject obj in spawnedObjects)
             {
                 if (obj != null)
                 {
                     Destroy(obj);
                 }
             }
-            Start();
+            spawnedObjects.Clear();
+            InitializeMap();
+            SetupField();
             clearText.SetActive(false);
         }
-        if (Input.GetKeyDown(KeyCode.RightArrow))
+
+        Vector2Int playerIndex = GetPlayerIndex();
+        if (playerIndex != new Vector2Int(-1, -1))
         {
-            Vector2Int playerindex = GetPlayerIndex();
-            //移動処理のメソッド化
-            if (playerindex != new Vector2Int(-1, -1))
+            if (Input.GetKeyDown(KeyCode.RightArrow))
             {
-                MoveNumber(playerindex, playerindex + new Vector2Int(1, 0));
+                MoveNumber(playerIndex, playerIndex + new Vector2Int(1, 0));
             }
-        }
-        if (Input.GetKeyDown(KeyCode.LeftArrow))
-        {
-            Vector2Int playerindex = GetPlayerIndex();
-            //移動処理のメソッド化
-            if (playerindex != new Vector2Int(-1, -1))
+            else if (Input.GetKeyDown(KeyCode.LeftArrow))
             {
-                MoveNumber(playerindex, playerindex + new Vector2Int(-1, 0));
+                MoveNumber(playerIndex, playerIndex + new Vector2Int(-1, 0));
             }
-        }
-        if (Input.GetKeyDown(KeyCode.UpArrow))
-        {
-            Vector2Int playerindex = GetPlayerIndex();
-            //移動処理のメソッド化
-            if (playerindex != new Vector2Int(-1, -1))
+            else if (Input.GetKeyDown(KeyCode.UpArrow))
             {
-                MoveNumber(playerindex, playerindex + new Vector2Int(0, -1));
+                MoveNumber(playerIndex, playerIndex + new Vector2Int(0, -1));
+            }
+            else if (Input.GetKeyDown(KeyCode.DownArrow))
+            {
+                MoveNumber(playerIndex, playerIndex + new Vector2Int(0, 1));
             }
         }
 
-        if (Input.GetKeyDown(KeyCode.DownArrow))
-        {
-            Vector2Int playerindex = GetPlayerIndex();
-            //移動処理のメソッド化
-            if (playerindex != new Vector2Int(-1, -1))
-            {
-                MoveNumber(playerindex, playerindex + new Vector2Int(0, 1));
-            }
-        }
         if (IsCleard())
         {
             Debug.Log("Clear");
             // パーティクルを生成（クリアテキストの位置）
-            Instantiate(ParticlePrefab, new Vector3(0.5f,0,-1), Quaternion.identity);
+            Instantiate(ParticlePrefab, new Vector3(0.5f, 0, -1), Quaternion.identity);
             clearText.SetActive(true);
+            if (Input.GetKeyDown(KeyCode.Space) && !next)
+            {
+                foreach (GameObject obj in spawnedObjects)
+                {
+                    if (obj != null)
+                    {
+                        Destroy(obj);
+                    }
+                }
+                spawnedObjects.Clear();
+                clearText.SetActive(false);
+                next = true;
+                InitializeMap();
+                SetupField();
+            }
         }
     }
 }
